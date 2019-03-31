@@ -3,19 +3,20 @@ from time import sleep
 import math
 
 pi = pigpio.pi()
-PIN_STEP = 20
+PIN_STEP = 21
 PIN_ENN = 4
-PIN_DIR = 21
+PIN_DIR = 20
 
 ACCELERATION_MS2 = 1.5
-MAX_VELOCITY_MS = 0.3
+MAX_VELOCITY_MS = 0.05
 HEIGHT_M = 0.5
-STEPS_PER_REV = 1200.0
+STEPS_PER_REV = 1600.0
 PULLEY_DIAMETER_M = 0.012
 
 PULLEY_CIRCUMF_M = PULLEY_DIAMETER_M * math.pi
 STEPS_PER_M = STEPS_PER_REV / PULLEY_CIRCUMF_M
 TOTAL_STEPS = HEIGHT_M * STEPS_PER_M
+print("total steps: {}".format(TOTAL_STEPS))
 
 accel_sequence = []
 decel_sequence = []
@@ -38,6 +39,7 @@ while current_velocity_ms < MAX_VELOCITY_MS and current_steps < TOTAL_STEPS/2:
 
     current_steps += 1
     time_since_start_s += delta_t_s
+print("accel/decel steps: {}".format(current_steps))
 
 delta_t_s = (1 / STEPS_PER_M) / MAX_VELOCITY_MS
 const_sequence.append(pigpio.pulse(1<<PIN_STEP, 0, int((1000000 * delta_t_s) / 2)))
