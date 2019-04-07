@@ -1,9 +1,15 @@
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
+from gi.repository import Gtk, Gdk
 import pigpio
 from time import sleep
 import math
+from dht11 import DHT11
+
+from matplotlib.backends.backend_gtk3agg import (
+        FigureCanvasGTK3Agg as FigureCanvas)
+from matplotlib.figure import Figure
+import numpy as np
 
 PIN_STEP = 21
 PIN_ENN = 4
@@ -12,11 +18,11 @@ PIN_LAMP = 26
 PIN_FAN = 13
 PIN_PUMP = 19
 
-ACCELERATION_MS2 = 1.5
+ACCELERATION_MS2 = 0.4
 MAX_VELOCITY_MS = 0.2
-HEIGHT_M = 0.5
+HEIGHT_M = 0.335
 STEPS_PER_REV = 1600.0
-PULLEY_DIAMETER_M = 0.012
+PULLEY_DIAMETER_M = 0.012 * (21.3 / 20.0)
 
 PULLEY_CIRCUMF_M = PULLEY_DIAMETER_M * math.pi
 STEPS_PER_M = STEPS_PER_REV / PULLEY_CIRCUMF_M
@@ -39,6 +45,23 @@ class MyWindow(Gtk.Window):
         grid = Gtk.Grid()
         self.add(grid)
 
+        #populate user interface
+
+        f = Figure(figsize=(5, 4), dpi=100)
+        a = f.add_subplot(3, 1, 1)
+        b = f.add_subplot(3, 1, 2)
+        c = f.add_subplot(3, 1, 3)
+        t = np.arange(0.0, 3.0, 0.01)
+        s = np.sin(2*np.pi*t)
+        a.set_title("Automated Indoor Greenhouse")
+        a.plot(t, s)
+        a.plot(t, -s)
+        b.plot(t, s)
+        c.plot(t, s)
+
+        
+        self.plot1 = FigureCanvas(f)
+        
         self.lamp_button = Gtk.Button(label="Lamp On/Off")
         self.lamp_button.connect("clicked", self.on_lamp_button_clicked)
         self.lamp_button.set_hexpand(True)
@@ -58,11 +81,14 @@ class MyWindow(Gtk.Window):
         self.door_button.connect("clicked", self.on_door_button_clicked)
         self.door_button.set_hexpand(True)
         self.door_button.set_vexpand(True)
+
+        self.plot1.set_size_request(480, 600)
+        grid.attach(self.plot1, left=0, top=0, width=2, height=1)
         
-        grid.attach(self.lamp_button, left=0, top=0, width=1, height=1)
-        grid.attach(self.fan_button, left=0, top=1, width=1, height=1)
+        grid.attach(self.lamp_button, left=0, top=1, width=1, height=1)
+        grid.attach(self.fan_button, left=1, top=1, width=1, height=1)
         grid.attach(self.pump_button, left=0, top=2, width=1, height=1)
-        grid.attach(self.door_button, left=0, top=3, width=1, height=1)
+        grid.attach(self.door_button, left=1, top=2, width=1, height=1)
         
         self.fullscreen()
                 
