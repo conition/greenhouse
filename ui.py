@@ -1,6 +1,6 @@
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk
+from gi.repository import Gtk, Gdk, GLib
 import pigpio
 from time import sleep
 import math
@@ -47,20 +47,20 @@ class MyWindow(Gtk.Window):
 
         #populate user interface
 
-        f = Figure(figsize=(5, 4), dpi=100)
-        a = f.add_subplot(3, 1, 1)
-        b = f.add_subplot(3, 1, 2)
-        c = f.add_subplot(3, 1, 3)
-        t = np.arange(0.0, 3.0, 0.01)
-        s = np.sin(2*np.pi*t)
-        a.set_title("Automated Indoor Greenhouse")
-        a.plot(t, s)
-        a.plot(t, -s)
-        b.plot(t, s)
-        c.plot(t, s)
+#        f = Figure(figsize=(5, 4), dpi=100)
+#        a = f.add_subplot(3, 1, 1)
+#        b = f.add_subplot(3, 1, 2)
+#        c = f.add_subplot(3, 1, 3)
+#        t = np.arange(0.0, 3.0, 0.01)
+#        s = np.sin(2*np.pi*t)
+#        a.set_title("Automated Indoor Greenhouse")
+#        a.plot(t, s)
+#        a.plot(t, -s)
+#        b.plot(t, s)
+#        c.plot(t, s)
 
         
-        self.plot1 = FigureCanvas(f)
+#        self.plot1 = FigureCanvas(f)
         
         self.lamp_button = Gtk.Button(label="Lamp On/Off")
         self.lamp_button.connect("clicked", self.on_lamp_button_clicked)
@@ -82,13 +82,28 @@ class MyWindow(Gtk.Window):
         self.door_button.set_hexpand(True)
         self.door_button.set_vexpand(True)
 
-        self.plot1.set_size_request(480, 600)
-        grid.attach(self.plot1, left=0, top=0, width=2, height=1)
+        self.moisture_levelbars = []
+        self.moisture_levelbars_labels = []
+        for i in range(8):
+            self.moisture_levelbars.append(Gtk.LevelBar(min_value=0, max_value=1023))
+            if i % 2 == 1:
+                postion = "bottom"
+            elif i % 2 == 0:
+                position = "top"
+            self.moisture_levelbars_labels.append(Gtk.Label("Plant {} ({})".format(i, position)))
+            
+        #self.plot1.set_size_request(480, 600)
+        #grid.attach(self.plot1, left=0, top=0, width=2, height=1)
         
-        grid.attach(self.lamp_button, left=0, top=1, width=1, height=1)
-        grid.attach(self.fan_button, left=1, top=1, width=1, height=1)
-        grid.attach(self.pump_button, left=0, top=2, width=1, height=1)
-        grid.attach(self.door_button, left=1, top=2, width=1, height=1)
+        for i in range(8):
+            grid.attach(self.moisture_levelbars_labels[i], left=0, top=2*i, width=2, height=1)
+            grid.attach(self.moisture_levelbars[i], left=0, top=2*i+1, width=2, height=1)
+
+        button_row = 16
+        grid.attach(self.lamp_button, left=0, top=button_row, width=1, height=1)
+        grid.attach(self.fan_button, left=1, top=button_row, width=1, height=1)
+        grid.attach(self.pump_button, left=0, top=button_row + 1, width=1, height=1)
+        grid.attach(self.door_button, left=1, top=button_row + 1, width=1, height=1)
         
         self.fullscreen()
                 
@@ -156,6 +171,23 @@ class MyWindow(Gtk.Window):
         self.pi.set_mode(PIN_PUMP, pigpio.OUTPUT)
         self.pump_state = 0
 
+        #initialize moisture sensors
+
+        # Open SPI bus
+        self.spi = self.pi.spi_open(spi_channel=0, baud=1000000, spi_flags=0)
+
+        # initialize timer to periodically read sensor data
+        self.timeout_id = GLib.timeout_add(200, self.on_periodic_timer)
+        
+
+            
+    # Function to read SPI data from MCP3008 chip
+    # Channel must be an integer 0-7
+    def read_mcp_3008(self, channel):
+        count, adc = self.pi.spi_xfer(self.spi, [1,(8+channel)<<4,0])
+        data = ((adc[1]&3) << 8) + adc[2]
+        return data
+        
     def on_lamp_button_clicked(self, widget):
         self.lamp_state = 1- self.lamp_state
         self.pi.write(PIN_LAMP, self.lamp_state)
@@ -203,6 +235,14 @@ class MyWindow(Gtk.Window):
             self.door_button.set_label(OPEN_DOOR_BUTTON_LABEL)
         else:
             self.door_button.set_label(CLOSE_DOOR_BUTTON_LABEL)
+
+    def on_periodic_timer(self):
+        self.moisture_data = np.zeros(8)
+        for i in range(8):
+            self.moisture_data[i] = self.read_mcp_3008(i)
+            self.moisture_levelbars[i].set_value(self.moisture_data[i])
+        print(self.moisture_data)
+        return True
         
 win = MyWindow()
 win.connect("destroy", Gtk.main_quit)
