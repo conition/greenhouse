@@ -2,9 +2,9 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib
 import pigpio
-from time import sleep
+import time
 import math
-from dht11 import DHT11
+from my_dht11 import DHT11
 
 from matplotlib.backends.backend_gtk3agg import (
         FigureCanvasGTK3Agg as FigureCanvas)
@@ -17,6 +17,9 @@ PIN_DIR = 20
 PIN_LAMP = 26
 PIN_FAN = 13
 PIN_PUMP = 19
+PIN_DHT11_INSIDE = 16
+PIN_DHT11_OUTSIDE = 17
+PIN_LIGHTGATE = 12
 
 ACCELERATION_MS2 = 0.4
 MAX_VELOCITY_MS = 0.2
@@ -45,6 +48,8 @@ class MyWindow(Gtk.Window):
         grid = Gtk.Grid()
         self.add(grid)
 
+        self.pi = pigpio.pi()
+        
         #populate user interface
 
 #        f = Figure(figsize=(5, 4), dpi=100)
@@ -85,30 +90,56 @@ class MyWindow(Gtk.Window):
         self.moisture_levelbars = []
         self.moisture_levelbars_labels = []
         for i in range(8):
-            self.moisture_levelbars.append(Gtk.LevelBar(min_value=0, max_value=1023))
+            self.moisture_levelbars.append(Gtk.LevelBar(min_value=0, max_value=1023, vexpand=True))
             if i % 2 == 1:
-                postion = "bottom"
+                position = "bottom"
             elif i % 2 == 0:
                 position = "top"
-            self.moisture_levelbars_labels.append(Gtk.Label("Plant {} ({})".format(i, position)))
-            
+            self.moisture_levelbars_labels.append(Gtk.Label("Plant {} ({})".format(int(i/2), position), vexpand=True))
+
+        self.last_read_dht11 = 0.0
+        self.inside_dht11 = DHT11(self.pi, PIN_DHT11_INSIDE)
+        self.outside_dht11 = DHT11(self.pi, PIN_DHT11_OUTSIDE)
+        self.inside_dht11_label = Gtk.Label("Inside Greenhouse:")
+        self.inside_dht11_temp_label = Gtk.Label("")
+        self.inside_dht11_humid_label = Gtk.Label("")
+        self.outside_dht11_label = Gtk.Label("Outside Greenhouse:")
+        self.outside_dht11_temp_label = Gtk.Label("")
+        self.outside_dht11_humid_label = Gtk.Label("")
+
+        self.lightgate_label = Gtk.Label("")
+        self.pi.set_mode(PIN_LIGHTGATE, pigpio.INPUT)
+
         #self.plot1.set_size_request(480, 600)
         #grid.attach(self.plot1, left=0, top=0, width=2, height=1)
+
+        total_num_cols = 3
         
         for i in range(8):
-            grid.attach(self.moisture_levelbars_labels[i], left=0, top=2*i, width=2, height=1)
-            grid.attach(self.moisture_levelbars[i], left=0, top=2*i+1, width=2, height=1)
+            grid.attach(self.moisture_levelbars_labels[i], left=0, top=2*i, width=total_num_cols, height=1)
+            grid.attach(self.moisture_levelbars[i], left=0, top=2*i+1, width=total_num_cols, height=1)
 
-        button_row = 16
+        lightgate_row = 16
+        grid.attach(self.lightgate_label, left=0, top=lightgate_row, width=total_num_cols, height=1)
+            
+        sensor_row = 17
+        grid.attach(self.inside_dht11_label,       left=0, top=sensor_row, width=1, height=1)
+        grid.attach(self.inside_dht11_temp_label,  left=1, top=sensor_row, width=1, height=1)
+        grid.attach(self.inside_dht11_humid_label, left=2, top=sensor_row, width=1, height=1)
+        grid.attach(self.outside_dht11_label,      left=0, top=sensor_row+1, width=1, height=1)
+        grid.attach(self.outside_dht11_temp_label, left=1, top=sensor_row+1, width=1, height=1)
+        grid.attach(self.outside_dht11_humid_label,left=2, top=sensor_row+1, width=1, height=1)
+
+            
+        button_row = 19
         grid.attach(self.lamp_button, left=0, top=button_row, width=1, height=1)
         grid.attach(self.fan_button, left=1, top=button_row, width=1, height=1)
-        grid.attach(self.pump_button, left=0, top=button_row + 1, width=1, height=1)
-        grid.attach(self.door_button, left=1, top=button_row + 1, width=1, height=1)
+        grid.attach(self.pump_button, left=2, top=button_row, width=1, height=1)
+        grid.attach(self.door_button, left=0, top=button_row + 1, width=total_num_cols, height=1)
         
         self.fullscreen()
                 
         #initialize wave form sequences for door
-        self.pi = pigpio.pi()
         accel_sequence = []
         decel_sequence = []
         const_sequence = []
@@ -178,7 +209,6 @@ class MyWindow(Gtk.Window):
 
         # initialize timer to periodically read sensor data
         self.timeout_id = GLib.timeout_add(200, self.on_periodic_timer)
-        
 
             
     # Function to read SPI data from MCP3008 chip
@@ -226,7 +256,7 @@ class MyWindow(Gtk.Window):
         ])
 
         while self.pi.wave_tx_busy():
-            sleep(0.1);
+            time.sleep(0.1);
 
         self.door_position = 1 - self.door_position
 
@@ -242,6 +272,18 @@ class MyWindow(Gtk.Window):
             self.moisture_data[i] = self.read_mcp_3008(i)
             self.moisture_levelbars[i].set_value(self.moisture_data[i])
         print(self.moisture_data)
+
+        if (time.time() - self.last_read_dht11 >= 1):
+            self.inside_dht11.read()
+            self.outside_dht11.read()
+            self.inside_dht11_temp_label.set_text("{} °".format(self.inside_dht11.temperature))
+            self.inside_dht11_humid_label.set_text("{} %".format(self.inside_dht11.humidity))
+            self.outside_dht11_temp_label.set_text("{} °".format(self.outside_dht11.temperature))
+            self.outside_dht11_humid_label.set_text("{} %".format(self.outside_dht11.humidity))
+            self.last_read_dht11 = time.time()
+
+        self.lightgate_label.set_text("Lightgate: {}".format(self.pi.read(PIN_LIGHTGATE)))
+        
         return True
         
 win = MyWindow()
