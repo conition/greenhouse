@@ -39,6 +39,15 @@ DOOR_UNKNOWN = 2
 OPEN_DOOR_BUTTON_LABEL = "Open Door"
 CLOSE_DOOR_BUTTON_LABEL = "Close Door"
 
+OFF_LABEL = "OFF"
+ON_LABEL = "ON"
+AUTO_LABEL = "AUTO"
+
+OFF = 0
+ON = 1
+AUTO = 2
+
+RADIO_BUTTON_HEIGHT = 64
 
 class MyWindow(Gtk.Window):
 
@@ -66,22 +75,69 @@ class MyWindow(Gtk.Window):
 
         
 #        self.plot1 = FigureCanvas(f)
+
+
+
+        # self.lamp_button = Gtk.Button(label="Lamp On/Off")
+        # self.lamp_button.connect("clicked", self.on_lamp_button_clicked)
+        # self.lamp_button.set_hexpand(True)
+        # self.lamp_button.set_vexpand(True)
+
+        # Set up Lamp Buttons
+        self.lamp_state = AUTO
         
-        self.lamp_button = Gtk.Button(label="Lamp On/Off")
-        self.lamp_button.connect("clicked", self.on_lamp_button_clicked)
-        self.lamp_button.set_hexpand(True)
-        self.lamp_button.set_vexpand(True)
+        self.lamp_button_off = Gtk.RadioButton.new_with_label_from_widget(None, label="Lamp Off")
+        self.lamp_button_off.set_active (False)
+        self.lamp_button_off.set_size_request(-1, RADIO_BUTTON_HEIGHT)
+        self.lamp_button_off.connect("toggled", self.on_lamp_button_toggled, OFF)
+
+        self.lamp_button_on = Gtk.RadioButton.new_with_label_from_widget(self.lamp_button_off, label="Lamp On")
+        self.lamp_button_on.set_active (False)
+        self.lamp_button_on.set_size_request(-1, RADIO_BUTTON_HEIGHT)
+        self.lamp_button_on.connect("toggled", self.on_lamp_button_toggled, ON)
         
-        self.fan_button = Gtk.Button(label="Fan On/Off")
-        self.fan_button.connect("clicked", self.on_fan_button_clicked)
-        self.fan_button.set_hexpand(True)
-        self.fan_button.set_vexpand(True)
+        self.lamp_button_auto = Gtk.RadioButton.new_with_label_from_widget(self.lamp_button_off, label="Lamp Auto")
+        self.lamp_button_auto.set_active (True)
+        self.lamp_button_auto.set_size_request(-1, RADIO_BUTTON_HEIGHT)
+        self.lamp_button_auto.connect("toggled", self.on_lamp_button_toggled, AUTO)
+
+        # Set up Fan Buttons
+        self.fan_state = AUTO
         
-        self.pump_button = Gtk.Button(label="Pump On/Off")
-        self.pump_button.connect("clicked", self.on_pump_button_clicked)
-        self.pump_button.set_hexpand(True)
-        self.pump_button.set_vexpand(True)
+        self.fan_button_off = Gtk.RadioButton.new_with_label_from_widget(None, label="Fan Off")
+        self.fan_button_off.set_active (False)
+        self.fan_button_off.set_size_request(-1, RADIO_BUTTON_HEIGHT)
+        self.fan_button_off.connect("toggled", self.on_fan_button_toggled, OFF)
+
+        self.fan_button_on = Gtk.RadioButton.new_with_label_from_widget(self.fan_button_off, label="Fan On")
+        self.fan_button_on.set_active (False)
+        self.fan_button_on.set_size_request(-1, RADIO_BUTTON_HEIGHT)
+        self.fan_button_on.connect("toggled", self.on_fan_button_toggled, ON)
         
+        self.fan_button_auto = Gtk.RadioButton.new_with_label_from_widget(self.fan_button_off, label="Fan Auto")
+        self.fan_button_auto.set_active (True)
+        self.fan_button_auto.set_size_request(-1, RADIO_BUTTON_HEIGHT)
+        self.fan_button_auto.connect("toggled", self.on_fan_button_toggled, AUTO)
+
+        # Set up Pump Buttons
+        self.pump_state = AUTO
+        
+        self.pump_button_off = Gtk.RadioButton.new_with_label_from_widget(None, label="Pump Off")
+        self.pump_button_off.set_active (False)
+        self.pump_button_off.set_size_request(-1, RADIO_BUTTON_HEIGHT)
+        self.pump_button_off.connect("toggled", self.on_pump_button_toggled, OFF)
+
+        self.pump_button_on = Gtk.RadioButton.new_with_label_from_widget(self.pump_button_off, label="Pump On")
+        self.pump_button_on.set_active (False)
+        self.pump_button_on.set_size_request(-1, RADIO_BUTTON_HEIGHT)
+        self.pump_button_on.connect("toggled", self.on_pump_button_toggled, ON)
+        
+        self.pump_button_auto = Gtk.RadioButton.new_with_label_from_widget(self.pump_button_off, label="Pump Auto")
+        self.pump_button_auto.set_active (True)
+        self.pump_button_auto.set_size_request(-1, RADIO_BUTTON_HEIGHT)
+        self.pump_button_auto.connect("toggled", self.on_pump_button_toggled, AUTO)
+
+    
         self.door_button = Gtk.Button(label=OPEN_DOOR_BUTTON_LABEL)
         self.door_button.connect("clicked", self.on_door_button_clicked)
         self.door_button.set_hexpand(True)
@@ -90,12 +146,14 @@ class MyWindow(Gtk.Window):
         self.moisture_levelbars = []
         self.moisture_levelbars_labels = []
         for i in range(8):
-            self.moisture_levelbars.append(Gtk.LevelBar(min_value=0, max_value=1023, vexpand=True))
-            if i % 2 == 1:
-                position = "bottom"
-            elif i % 2 == 0:
-                position = "top"
-            self.moisture_levelbars_labels.append(Gtk.Label("Plant {} ({})".format(int(i/2), position), vexpand=True))
+            self.moisture_levelbars.append(Gtk.LevelBar(min_value=0, max_value=1023))
+            #            if i % 2 == 1:
+            #                position = "bottom"
+            #            elif i % 2 == 0:
+            #                position = "top"
+            self.moisture_levelbars[i].set_size_request(-1, 20)
+            if i % 2 == 0:
+                self.moisture_levelbars_labels.append(Gtk.Label("Plant {} (top / bottom)".format(int(i/2))))
 
         self.last_read_dht11 = 0.0
         self.inside_dht11 = DHT11(self.pi, PIN_DHT11_INSIDE)
@@ -116,7 +174,8 @@ class MyWindow(Gtk.Window):
         total_num_cols = 3
         
         for i in range(8):
-            grid.attach(self.moisture_levelbars_labels[i], left=0, top=2*i, width=total_num_cols, height=1)
+            if i % 2 == 0:
+                grid.attach(self.moisture_levelbars_labels[int(i/2)], left=0, top=2*i, width=total_num_cols, height=1)
             grid.attach(self.moisture_levelbars[i], left=0, top=2*i+1, width=total_num_cols, height=1)
 
         lightgate_row = 16
@@ -132,10 +191,19 @@ class MyWindow(Gtk.Window):
 
             
         button_row = 19
-        grid.attach(self.lamp_button, left=0, top=button_row, width=1, height=1)
-        grid.attach(self.fan_button, left=1, top=button_row, width=1, height=1)
-        grid.attach(self.pump_button, left=2, top=button_row, width=1, height=1)
-        grid.attach(self.door_button, left=0, top=button_row + 1, width=total_num_cols, height=1)
+        grid.attach(self.lamp_button_off, left=0, top=button_row, width=1, height=1)
+        grid.attach(self.lamp_button_on, left=0, top=button_row+1, width=1, height=1)
+        grid.attach(self.lamp_button_auto, left=0, top=button_row+2, width=1, height=1)
+
+        grid.attach(self.fan_button_off, left=1, top=button_row, width=1, height=1)
+        grid.attach(self.fan_button_on, left=1, top=button_row+1, width=1, height=1)
+        grid.attach(self.fan_button_auto, left=1, top=button_row+2, width=1, height=1)
+
+        grid.attach(self.pump_button_off, left=2, top=button_row, width=1, height=1)
+        grid.attach(self.pump_button_on, left=2, top=button_row+1, width=1, height=1)
+        grid.attach(self.pump_button_auto, left=2, top=button_row+2, width=1, height=1)
+
+        grid.attach(self.door_button, left=0, top=button_row+3, width=total_num_cols, height=1)
         
         self.fullscreen()
                 
@@ -217,22 +285,32 @@ class MyWindow(Gtk.Window):
         count, adc = self.pi.spi_xfer(self.spi, [1,(8+channel)<<4,0])
         data = ((adc[1]&3) << 8) + adc[2]
         return data
-        
-    def on_lamp_button_clicked(self, widget):
-        self.lamp_state = 1- self.lamp_state
-        self.pi.write(PIN_LAMP, self.lamp_state)
-        print("Lamp: {}".format(self.lamp_state))
 
-    def on_fan_button_clicked(self, widget):
-        self.fan_state = 1- self.fan_state
-        self.pi.write(PIN_FAN, self.fan_state)
-        print("Fan: {}".format(self.fan_state))
+    def on_lamp_button_toggled(self, button, name):
+        if button.get_active():
+            self.lamp_state = name
+            if name == OFF or name == ON:
+                self.pi.write(PIN_LAMP, self.lamp_state)
 
-    def on_pump_button_clicked(self, widget):
-        self.pump_state = 1- self.pump_state
-        self.pi.write(PIN_PUMP, self.pump_state)
-        print("Pump: {}".format(self.pump_state))
+            print("Lamp is now {}".format(self.lamp_state))
         
+    def on_fan_button_toggled(self, button, name):
+        if button.get_active():
+            self.fan_state = name
+            if name == OFF or name == ON:
+                self.pi.write(PIN_FAN, self.fan_state)
+
+            print("Fan is now {}".format(self.fan_state))
+
+    def on_pump_button_toggled(self, button, name):
+        if button.get_active():
+            self.pump_state = name
+            if name == OFF or name == ON:
+                self.pi.write(PIN_PUMP, self.pump_state)
+
+            print("Pump is now {}".format(self.pump_state))
+
+
     def on_door_button_clicked(self, widget):
         print("Hello World")
 
