@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Greenhouse_UI
+Exec=/usr/bin/python3 /home/pi/greenhouse/ui.py
+Name[en_GB]=Greenhouse
+Icon=rpi
